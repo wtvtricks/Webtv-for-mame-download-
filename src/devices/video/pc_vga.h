@@ -21,9 +21,9 @@
 // ======================> vga_device
 
 class vga_device : public device_t
-                 , public device_video_interface
-                 , public device_palette_interface
-                 , public device_memory_interface
+				 , public device_video_interface
+				 , public device_palette_interface
+				 , public device_memory_interface
 {
 	friend class ibm8514a_device;
 
@@ -151,6 +151,7 @@ protected:
 
 		return res;
 	}
+	virtual bool get_interlace_mode() { return false; }
 
 	struct vga_t
 	{
@@ -282,7 +283,9 @@ protected:
 		CRTC_REG,
 		GC_REG,
 		SEQ_REG,
-		ATC_REG
+		ATC_REG,
+		// pointer for subclasses to declare further spaces
+		EXT_REG
 	};
 
 	address_space_config m_main_if_space_config;
