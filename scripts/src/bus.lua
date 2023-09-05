@@ -986,6 +986,8 @@ if (BUSES["C64"]~=null) then
 		MAME_DIR .. "src/devices/bus/c64/swiftlink.h",
 		MAME_DIR .. "src/devices/bus/c64/system3.cpp",
 		MAME_DIR .. "src/devices/bus/c64/system3.h",
+		MAME_DIR .. "src/devices/bus/c64/tibdd001.cpp",
+		MAME_DIR .. "src/devices/bus/c64/tibdd001.h",
 		MAME_DIR .. "src/devices/bus/c64/tdos.cpp",
 		MAME_DIR .. "src/devices/bus/c64/tdos.h",
 		MAME_DIR .. "src/devices/bus/c64/turbo232.cpp",
@@ -1953,6 +1955,8 @@ if (BUSES["MSX_SLOT"]~=null) then
 		MAME_DIR .. "src/devices/bus/msx/cart/loveplus.h",
 		MAME_DIR .. "src/devices/bus/msx/cart/majutsushi.cpp",
 		MAME_DIR .. "src/devices/bus/msx/cart/majutsushi.h",
+		MAME_DIR .. "src/devices/bus/msx/cart/matra.cpp",
+		MAME_DIR .. "src/devices/bus/msx/cart/matra.h",
 		MAME_DIR .. "src/devices/bus/msx/cart/moonsound.h",
 		MAME_DIR .. "src/devices/bus/msx/cart/moonsound.cpp",
 		MAME_DIR .. "src/devices/bus/msx/cart/msx_audio.cpp",
@@ -2639,6 +2643,8 @@ end
 
 if (BUSES["VME"]~=null) then
 	files {
+		MAME_DIR .. "src/devices/bus/vme/enp10.cpp",
+		MAME_DIR .. "src/devices/bus/vme/enp10.h",
 		MAME_DIR .. "src/devices/bus/vme/mvme187.cpp",
 		MAME_DIR .. "src/devices/bus/vme/mvme187.h",
 		MAME_DIR .. "src/devices/bus/vme/tp881v.cpp",
@@ -4608,6 +4614,8 @@ if (BUSES["ZXBUS"]~=null) then
 	files {
 		MAME_DIR .. "src/devices/bus/spectrum/zxbus.cpp",
 		MAME_DIR .. "src/devices/bus/spectrum/zxbus.h",
+		MAME_DIR .. "src/devices/bus/spectrum/nemoide.cpp",
+		MAME_DIR .. "src/devices/bus/spectrum/nemoide.h",
 		MAME_DIR .. "src/devices/bus/spectrum/neogs.cpp",
 		MAME_DIR .. "src/devices/bus/spectrum/neogs.h",
 		MAME_DIR .. "src/devices/bus/spectrum/smuc.cpp",
