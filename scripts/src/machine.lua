@@ -5305,17 +5305,3 @@ if (MACHINES["TC9223"]~=null) then
 		MAME_DIR .. "src/devices/machine/tc9223.h",
 	}
 end
-
----------------------------------------------------
---
---@src/devices/machine/solo1_asic.h,MACHINES["SOLO1_ASIC"] = true
----------------------------------------------------
-
-if (MACHINES["SOLO1_ASIC"]~=null) then
-	files {
-		MAME_DIR .. "src/devices/machine/solo1_asic_vid.cpp",
-		MAME_DIR .. "src/devices/machine/solo1_asic_vid.h",
-		MAME_DIR .. "src/devices/machine/solo1_asic.cpp",
-		MAME_DIR .. "src/devices/machine/solo1_asic.h",
-	}
-end
