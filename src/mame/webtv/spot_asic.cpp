@@ -56,7 +56,11 @@ spot_asic_device::spot_asic_device(const machine_config &mconfig, const char *ta
 	m_nvram(*this, finder_base::DUMMY_TAG),
 	m_kbdc(*this, "kbdc"),
 	m_screen(*this, "screen"),
+	m_dac(*this, "dac%u", 0),
+	m_lspeaker(*this, "lspeaker"),
+	m_rspeaker(*this, "rspeaker"),
     m_modem_uart(*this, "modem_uart"),
+	m_watchdog(*this, "watchdog"),
     m_sys_config(*owner, "sys_config"),
     m_emu_config(*owner, "emu_config"),
     m_power_led(*this, "power_led"),
@@ -180,6 +184,11 @@ void spot_asic_device::device_add_mconfig(machine_config &config)
 	m_screen->set_screen_update(FUNC(spot_asic_device::screen_update));
 	m_screen->screen_vblank().set(FUNC(spot_asic_device::vblank_irq));
 
+	SPEAKER(config, m_lspeaker).front_left();
+	SPEAKER(config, m_rspeaker).front_right();
+	DAC_16BIT_R2R_TWOS_COMPLEMENT(config, m_dac[0], 0).add_route(0, m_lspeaker, 0.0);
+	DAC_16BIT_R2R_TWOS_COMPLEMENT(config, m_dac[1], 0).add_route(0, m_rspeaker, 0.0);
+
 	INS8250(config, m_modem_uart, 1.8432_MHz_XTAL);
 	m_modem_uart->out_tx_callback().set("modem", FUNC(rs232_port_device::write_txd));
 	m_modem_uart->out_dtr_callback().set("modem", FUNC(rs232_port_device::write_dtr));
@@ -202,6 +211,9 @@ void spot_asic_device::device_add_mconfig(machine_config &config)
 
 	at_keyboard_device &at_keyb(AT_KEYB(config, "at_keyboard", pc_keyboard_device::KEYBOARD_TYPE::AT, 1));
 	at_keyb.keypress().set(m_kbdc, FUNC(kbdc8042_device::keyboard_w));
+
+	WATCHDOG_TIMER(config, m_watchdog);
+	spot_asic_device::watchdog_enable(0);
 }
 
 void spot_asic_device::activate_ntsc_screen()
@@ -224,13 +236,16 @@ void spot_asic_device::device_start()
 	m_connect_led.resolve();
 	m_message_led.resolve();
 
-	spot_asic_device::device_reset();
-
+	dac_update_timer = timer_alloc(FUNC(spot_asic_device::dac_update), this);
 	modem_buffer_timer = timer_alloc(FUNC(spot_asic_device::flush_modem_buffer), this);
+
+	spot_asic_device::device_reset();
 
 	save_item(NAME(m_intenable));
 	save_item(NAME(m_intstat));
 	save_item(NAME(m_errenable));
+	save_item(NAME(m_chpcntl));
+	save_item(NAME(m_wdenable));
 	save_item(NAME(m_errstat));
 	save_item(NAME(m_vid_nstart));
 	save_item(NAME(m_vid_nsize));
@@ -248,6 +263,14 @@ void spot_asic_device::device_start()
 	save_item(NAME(m_vid_cline));
 	save_item(NAME(m_vid_drawstart));
 	save_item(NAME(m_vid_drawvsize));
+	save_item(NAME(m_aud_cstart));
+	save_item(NAME(m_aud_csize));
+	save_item(NAME(m_aud_cconfig));
+	save_item(NAME(m_aud_ccnt));
+	save_item(NAME(m_aud_nstart));
+	save_item(NAME(m_aud_nsize));
+	save_item(NAME(m_aud_nconfig));
+	save_item(NAME(m_aud_dmacntl));
 	save_item(NAME(m_smrtcrd_serial_bitmask));
 	save_item(NAME(m_smrtcrd_serial_rxdata));
 	save_item(NAME(m_ledstate));
@@ -255,6 +278,8 @@ void spot_asic_device::device_start()
 
 void spot_asic_device::device_reset()
 {
+	dac_update_timer->adjust(attotime::from_hz(AUD_SAMPLE_RATE), 0, attotime::from_hz(AUD_SAMPLE_RATE));
+
 	m_memcntl = 0b11;
 	m_memrefcnt = 0x0400;
 	m_memdata = 0x0;
@@ -262,6 +287,8 @@ void spot_asic_device::device_reset()
 	m_intenable = 0x0;
 	m_intstat = 0x0;
 	m_errenable = 0x0;
+	m_chpcntl = 0x0;
+	m_wdenable = 0x0;
 	m_errstat = 0x0;
 	m_timeout_compare = 0xffff;
 	m_nvcntl = 0x0;
@@ -284,6 +311,16 @@ void spot_asic_device::device_reset()
 	m_vid_csize = 0x0;
 	m_vid_ccnt = 0x0;
 	m_vid_cline = 0x0;
+
+	m_aud_cstart = 0x0;
+	m_aud_csize = 0x0;
+	m_aud_cend = 0x0;
+	m_aud_cconfig = 0x0;
+	m_aud_ccnt = 0x0;
+	m_aud_nstart = 0x0;
+	m_aud_nsize = 0x0;
+	m_aud_nconfig = 0x0;
+	m_aud_dmacntl = 0x0;
 
 	m_vid_drawstart = 0x0;
 	m_vid_drawvsize = m_vid_vsize;
@@ -363,6 +400,18 @@ void spot_asic_device::pixel_buffer_index_update()
 	}
 }
 
+void spot_asic_device::watchdog_enable(int state)
+{
+	m_wdenable = state;
+
+	m_watchdog->watchdog_enable(m_wdenable);
+
+	if(m_wdenable)
+		m_watchdog->set_time(attotime::from_usec(WATCHDOG_TIMER_USEC));
+	else
+		m_watchdog->set_time(attotime::zero);
+}
+
 uint32_t spot_asic_device::reg_0000_r()
 {
 	//logerror("%s: reg_0000_r (BUS_CHIPID)\n", machine().describe_context());
@@ -372,12 +421,29 @@ uint32_t spot_asic_device::reg_0000_r()
 uint32_t spot_asic_device::reg_0004_r()
 {
 	logerror("%s: reg_0004_r (BUS_CHPCNTL)\n", machine().describe_context());
-	return 0x00000000;
+	return m_chpcntl;
 }
 
 void spot_asic_device::reg_0004_w(uint32_t data)
 {
 	logerror("%s: reg_0004_w %08x (BUS_CHPCNTL)\n", machine().describe_context(), data);
+	if ((m_chpcntl ^ data) & 0xC0000000)
+	{
+		uint8_t wd_cntl = (data >> 30);
+
+		int8_t wd_diff = wd_cntl - (m_chpcntl >> 30);
+
+		// Count down to disable (3, 2, 1, 0), count up to enable (0, 1, 2, 3)
+		// This doesn't track the count history but gets the expected result for the ROM.
+		if((!m_wdenable && wd_diff == 1 && wd_cntl == 3) || (m_wdenable && wd_diff == -1 && wd_cntl == 0))
+		{
+			watchdog_enable(wd_cntl == 3);
+		}
+	}
+
+	m_chpcntl = data;
+
+	m_aud_clkdiv = (data >> 26) & 0xF;
 }
 
 uint32_t spot_asic_device::reg_0008_r()
@@ -390,10 +456,7 @@ void spot_asic_device::reg_0108_w(uint32_t data)
 {
 	logerror("%s: reg_0108_w %08x (BUS_INTSTAT clear)\n", machine().describe_context(), data);
 
-	if (data & BUS_INT_VIDINT)
-		spot_asic_device::set_vid_irq(0xf, 0);
-
-	m_intstat &= (~data) & 0xFF;
+	spot_asic_device::set_bus_irq(data, 0);
 }
 
 uint32_t spot_asic_device::reg_000c_r()
@@ -476,8 +539,9 @@ uint32_t spot_asic_device::reg_0018_r()
 
 void spot_asic_device::reg_0118_w(uint32_t data)
 {
-    logerror("%s: reg_0118_w %08x (BUS_WDREG clear)\n", machine().describe_context(), data);
-    // TODO: watchdog
+	logerror("%s: reg_0118_w %08x (BUS_WDREG clear)\n", machine().describe_context(), data);
+	if(m_wdenable)
+		m_watchdog->reset_w(data);
 }
 
 uint32_t spot_asic_device::reg_001c_r()
@@ -559,74 +623,98 @@ void spot_asic_device::reg_1008_w(uint32_t data)
 uint32_t spot_asic_device::reg_2000_r()
 {
 	logerror("%s: reg_2000_r (AUD_CSTART)\n", machine().describe_context());
-	return 0;
+	return m_aud_cstart;
 }
 
 uint32_t spot_asic_device::reg_2004_r()
 {
 	logerror("%s: reg_2004_r (AUD_CSIZE)\n", machine().describe_context());
-	return 0;
+	return m_aud_csize;
 }
 
 uint32_t spot_asic_device::reg_2008_r()
 {
 	logerror("%s: reg_2008_r (AUD_CCONFIG)\n", machine().describe_context());
-	return 0;
+	return m_aud_cconfig;
 }
 
 void spot_asic_device::reg_2008_w(uint32_t data)
 {
 	logerror("%s: reg_2008_w %08x (AUD_CCONFIG)\n", machine().describe_context(), data);
+	m_aud_cconfig = data;
 }
 
 uint32_t spot_asic_device::reg_200c_r()
 {
 	logerror("%s: reg_200c_r (AUD_CCNT)\n", machine().describe_context());
-	return 0;
+	return m_aud_ccnt;
 }
 
 uint32_t spot_asic_device::reg_2010_r()
 {
 	logerror("%s: reg_2010_r (AUD_NSTART)\n", machine().describe_context());
-	return 0;
+	return m_aud_nstart;
 }
 
 void spot_asic_device::reg_2010_w(uint32_t data)
 {
 	logerror("%s: reg_2010_w %08x (AUD_NSTART)\n", machine().describe_context(), data);
+	m_aud_nstart = data;
 }
 
 uint32_t spot_asic_device::reg_2014_r()
 {
 	logerror("%s: reg_2014_r (AUD_NSIZE)\n", machine().describe_context());
-	return 0;
+	return m_aud_nsize;
 }
 
 void spot_asic_device::reg_2014_w(uint32_t data)
 {
 	logerror("%s: reg_2014_w %08x (AUD_NSIZE)\n", machine().describe_context(), data);
+
+	m_aud_nsize = data;
 }
 
 uint32_t spot_asic_device::reg_2018_r()
 {
 	logerror("%s: reg_2018_r (AUD_NCONFIG)\n", machine().describe_context());
-	return 0;
+	return m_aud_nconfig;
 }
 
 void spot_asic_device::reg_2018_w(uint32_t data)
 {
 	logerror("%s: reg_2018_w %08x (AUD_NCONFIG)\n", machine().describe_context(), data);
+
+	m_aud_nconfig = data;
 }
 
 uint32_t spot_asic_device::reg_201c_r()
 {
-    logerror("%s: reg_201c_r (AUD_DMACNTL)\n", machine().describe_context());
-    return 0;
+	logerror("%s: reg_201c_r (AUD_DMACNTL)\n", machine().describe_context());
+
+	spot_asic_device::irq_audio_w(0);
+
+	return m_aud_dmacntl;
 }
 
 void spot_asic_device::reg_201c_w(uint32_t data)
 {
     logerror("%s: reg_201c_w %08x (AUD_DMACNTL)\n", machine().describe_context(), data);
+	if ((m_aud_dmacntl ^ data) & AUD_DMACNTL_DMAEN)
+	{
+		if(data & AUD_DMACNTL_DMAEN)
+		{
+			m_lspeaker->set_input_gain(0, AUD_OUTPUT_GAIN);
+			m_rspeaker->set_input_gain(0, AUD_OUTPUT_GAIN);
+		}
+		else
+		{
+			m_lspeaker->set_input_gain(0, 0.0);
+			m_rspeaker->set_input_gain(0, 0.0);
+		}
+	}
+
+	m_aud_dmacntl = data;
 }
 
 uint32_t spot_asic_device::reg_3000_r()
@@ -983,13 +1071,13 @@ void spot_asic_device::reg_4020_w(uint32_t data)
 uint32_t spot_asic_device::reg_4024_r()
 {
 	logerror("%s: reg_4024_r (DEV_KBD1)\n", machine().describe_context());
-	return m_kbdc->data_r(0x1);
+	return m_kbdc->data_r(0x4);
 }
 
 void spot_asic_device::reg_4024_w(uint32_t data)
 {
 	logerror("%s: reg_4024_w %08x (DEV_KBD1)\n", machine().describe_context(), data);
-	m_kbdc->data_w(0x1, data & 0xFF);
+	m_kbdc->data_w(0x4, data & 0xFF);
 }
 
 uint32_t spot_asic_device::reg_4028_r()
@@ -1019,13 +1107,13 @@ void spot_asic_device::reg_402c_w(uint32_t data)
 uint32_t spot_asic_device::reg_4030_r()
 {
 	logerror("%s: reg_4030_r (DEV_KBD4)\n", machine().describe_context());
-	return m_kbdc->data_r(0x4);
+	return m_kbdc->data_r(0x1);
 }
 
 void spot_asic_device::reg_4030_w(uint32_t data)
 {
 	logerror("%s: reg_4030_w %08x (DEV_KBD4)\n", machine().describe_context(), data);
-	m_kbdc->data_w(0x4, data & 0xFF);
+	m_kbdc->data_w(0x1, data & 0xFF);
 }
 
 uint32_t spot_asic_device::reg_4034_r()
@@ -1082,7 +1170,7 @@ void spot_asic_device::reg_4040_w(uint32_t data)
 	{
 		modem_txbuff[modem_txbuff_size++ & (MBUFF_MAX_SIZE - 1)] = data & 0xFF;
 
-		modem_buffer_timer->adjust(attotime::from_usec(1000));
+		modem_buffer_timer->adjust(attotime::from_usec(MBUFF_FLUSH_TIME));
 	}
 }
 
@@ -1232,6 +1320,55 @@ void spot_asic_device::reg_5010_w(uint32_t data)
 	m_memtiming = data;
 }
 
+TIMER_CALLBACK_MEMBER(spot_asic_device::dac_update)
+{
+	if(m_aud_dmacntl & AUD_DMACNTL_DMAEN && m_aud_dmacntl & AUD_DMACNTL_NV)
+	{
+		address_space &space = m_hostcpu->space(AS_PROGRAM);
+
+		int16_t samplel = space.read_dword(m_aud_ccnt);
+		m_aud_ccnt += 2;
+		int16_t sampler = space.read_dword(m_aud_ccnt);
+		m_aud_ccnt += 2;
+
+		// For 8-bit we're assuming left-aligned samples
+		switch(m_aud_cconfig)
+		{
+			case AUD_CONFIG_16BIT_STEREO:
+			default:
+				m_dac[0]->write(samplel);
+				m_dac[1]->write(sampler);
+				break;
+
+			case AUD_CONFIG_16BIT_MONO:
+				m_dac[0]->write(samplel);
+				m_dac[1]->write(samplel);
+				break;
+
+			case AUD_CONFIG_8BIT_STEREO:
+				m_dac[0]->write((samplel >> 0x8) & 0xFF);
+				m_dac[1]->write((sampler >> 0x8) & 0xFF);
+				break;
+
+			case AUD_CONFIG_8BIT_MONO:
+				m_dac[0]->write((samplel >> 0x8) & 0xFF);
+				m_dac[1]->write((samplel >> 0x8) & 0xFF);
+				break;
+		}
+
+
+		if(m_aud_ccnt >= m_aud_cend)
+		{
+			spot_asic_device::irq_audio_w(1);
+			m_aud_cstart = m_aud_nstart;
+			m_aud_csize = m_aud_nsize;
+			m_aud_cend = (m_aud_cstart + m_aud_csize);
+			m_aud_cconfig = m_aud_nconfig;
+			m_aud_ccnt = m_aud_cstart;
+		}
+	}
+}
+
 TIMER_CALLBACK_MEMBER(spot_asic_device::flush_modem_buffer)
 {
 	if(modem_txbuff_size > 0 && (m_modem_uart->ins8250_r(0x5) & INS8250_LSR_TSRE))
@@ -1247,7 +1384,7 @@ TIMER_CALLBACK_MEMBER(spot_asic_device::flush_modem_buffer)
 
 	if(modem_txbuff_size > 0)
 	{
-		modem_buffer_timer->adjust(attotime::from_usec(1000));
+		modem_buffer_timer->adjust(attotime::from_usec(MBUFF_FLUSH_TIME));
 	}
 }
 
@@ -1268,6 +1405,11 @@ void spot_asic_device::irq_keyboard_w(int state)
 void spot_asic_device::irq_smartcard_w(int state)
 {
     spot_asic_device::set_bus_irq(BUS_INT_DEVSMC, state);
+}
+
+void spot_asic_device::irq_audio_w(int state)
+{
+	spot_asic_device::set_bus_irq(BUS_INT_AUDDMA, state);
 }
 
 void spot_asic_device::irq_modem_w(int state)
@@ -1297,8 +1439,6 @@ void spot_asic_device::set_vid_irq(uint8_t mask, int state)
 			m_vid_intstat |= mask;
 		else
 			m_vid_intstat &= ~(mask);
-
-		m_intenable |= BUS_INT_VIDINT;
 
 		spot_asic_device::set_bus_irq(BUS_INT_VIDINT, state);
 	}
