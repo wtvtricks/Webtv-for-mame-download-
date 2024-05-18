@@ -189,7 +189,7 @@ void spot_asic_device::device_add_mconfig(machine_config &config)
 	DAC_16BIT_R2R_TWOS_COMPLEMENT(config, m_dac[0], 0).add_route(0, m_lspeaker, 0.0);
 	DAC_16BIT_R2R_TWOS_COMPLEMENT(config, m_dac[1], 0).add_route(0, m_rspeaker, 0.0);
 
-	INS8250(config, m_modem_uart, 1.8432_MHz_XTAL);
+	NS16550(config, m_modem_uart, 1.8432_MHz_XTAL);
 	m_modem_uart->out_tx_callback().set("modem", FUNC(rs232_port_device::write_txd));
 	m_modem_uart->out_dtr_callback().set("modem", FUNC(rs232_port_device::write_dtr));
 	m_modem_uart->out_rts_callback().set("modem", FUNC(rs232_port_device::write_rts));
@@ -197,11 +197,11 @@ void spot_asic_device::device_add_mconfig(machine_config &config)
     
 	rs232_port_device &rs232(RS232_PORT(config, "modem", default_rs232_devices, "null_modem"));
     rs232.set_option_device_input_defaults("null_modem", DEVICE_INPUT_DEFAULTS_NAME(wtv_modem));
-	rs232.rxd_handler().set(m_modem_uart, FUNC(ins8250_uart_device::rx_w));
-	rs232.dcd_handler().set(m_modem_uart, FUNC(ins8250_uart_device::dcd_w));
-	rs232.dsr_handler().set(m_modem_uart, FUNC(ins8250_uart_device::dsr_w));
-	rs232.ri_handler().set(m_modem_uart, FUNC(ins8250_uart_device::ri_w));
-	rs232.cts_handler().set(m_modem_uart, FUNC(ins8250_uart_device::cts_w));
+	rs232.rxd_handler().set(m_modem_uart, FUNC(ns16450_device::rx_w));
+	rs232.dcd_handler().set(m_modem_uart, FUNC(ns16450_device::dcd_w));
+	rs232.dsr_handler().set(m_modem_uart, FUNC(ns16450_device::dsr_w));
+	rs232.ri_handler().set(m_modem_uart, FUNC(ns16450_device::ri_w));
+	rs232.cts_handler().set(m_modem_uart, FUNC(ns16450_device::cts_w));
 
 	KBDC8042(config, m_kbdc);
 	m_kbdc->set_keyboard_type(kbdc8042_device::KBDC8042_PS2);
@@ -954,21 +954,79 @@ void spot_asic_device::reg_4004_w(uint32_t data)
 	m_message_led = !BIT(m_ledstate, 0);
 }
 
-// Read from DS2401
+// Not using logic inside DS2401.cpp because the delay logic in the ROM doesn't work properly.
+
 uint32_t spot_asic_device::reg_4008_r()
 {
-    // TODO: is this correct?
-    logerror("%s: reg_4008_r (DEV_IDCNTL)\n", machine().describe_context());
-    return (m_serial_id->read() + (m_serial_id_tx << 1));
+	dev_id_bit = 0x0;
+
+	if(dev_id_state == SSID_STATE_PRESENCE)
+	{
+		dev_id_bit = 0x0; // We're present.
+		dev_id_state = SSID_STATE_COMMAND; // This normally would stay in presence mode for 480us then command, but we immediatly go into command mode.
+		dev_id_bitidx = 0x0;
+	}
+	else if(dev_id_state == SSID_STATE_READROM_PULSEEND)
+	{
+		dev_id_state = SSID_STATE_READROM_BIT;
+	}
+	else if(dev_id_state == SSID_STATE_READROM_BIT)
+	{
+		dev_id_state = SSID_STATE_READROM; // Go back into the read ROM pulse state
+
+		dev_id_bit = m_serial_id->direct_read(dev_id_bitidx / 8) >> (dev_id_bitidx & 0x7);
+
+		dev_id_bitidx++;
+		if(dev_id_bitidx == 64)
+		{
+			// We've read the entire SSID. Go back into idle.
+			dev_id_state = SSID_STATE_IDLE;
+			dev_id_bitidx = 0x0;
+		}
+	}
+
+	return dev_idcntl | (dev_id_bit & 1);
 }
 
-// Write to DS2401
 void spot_asic_device::reg_4008_w(uint32_t data)
 {
-    // TODO: is this correct?
-    m_serial_id_tx = BIT(data, 1);
-    logerror("%s: reg_4008_w %08x - write %d (DEV_IDCNTL)\n", machine().describe_context(), data, m_serial_id_tx);
-    m_serial_id->write(m_serial_id_tx ? ASSERT_LINE : CLEAR_LINE);
+	dev_idcntl = (data & 0x2);
+
+	if(dev_idcntl & 0x2)
+	{
+		switch(dev_id_state) // States for high
+		{
+			case SSID_STATE_RESET: // End reset low pulse to go into prescense mode. Chip should read low to indicate presence.
+				dev_id_state = SSID_STATE_PRESENCE; // This pulse normally lasts 480us before going into command mode.
+				break;
+
+			case SSID_STATE_COMMAND: // Ended a command bit pulse. Increment bit index. We always assume a read from ROM command after we get 8 bits.
+				dev_id_bitidx++;
+
+				if(dev_id_bitidx == 8)
+				{
+					dev_id_state = SSID_STATE_READROM; // Now we can read back the SSID. ROM reads it as two 32-bit integers.
+					dev_id_bitidx = 0;
+				}
+				break;
+
+			case SSID_STATE_READROM_PULSESTART:
+				dev_id_state = SSID_STATE_READROM_PULSEEND;
+		}
+	}
+	else
+	{
+		switch(dev_id_state) // States for low
+		{
+			case SSID_STATE_IDLE: // When idle, we can drive the chip low for reset
+				dev_id_state = SSID_STATE_RESET; // We'd normally leave this for 480us to go into presence mode.
+				break;
+
+			case SSID_STATE_READROM:
+				dev_id_state = SSID_STATE_READROM_PULSESTART;
+				break;
+		}
+	}
 }
 
 // Read from I2C EEPROM device (24C01A?)
