@@ -92,15 +92,18 @@ DEFINE_DEVICE_TYPE(AMD_29F400T,           amd_29f400t_device,           "amd_29f
 DEFINE_DEVICE_TYPE(AMD_29F800T,           amd_29f800t_device,           "amd_29f800t",           "AMD 29F800T Flash")
 DEFINE_DEVICE_TYPE(AMD_29F800B_16BIT,     amd_29f800b_16bit_device,     "amd_29f800b_16bit",     "AMD 29F800B Flash (16-bit)")
 DEFINE_DEVICE_TYPE(AMD_29LV200T,          amd_29lv200t_device,          "amd_29lv200t",          "AMD 29LV200T Flash")
+DEFINE_DEVICE_TYPE(AMD_29LV800B_16BIT,    amd_29lv800b_16bit_device,    "amd_29lv800b_16bit",    "AMD 29LV800B Flash")
 DEFINE_DEVICE_TYPE(FUJITSU_29F160TE,      fujitsu_29f160te_device,      "mbm29f160te",           "Fujitsu MBM29F160TE Flash")
 DEFINE_DEVICE_TYPE(FUJITSU_29F016A,       fujitsu_29f016a_device,       "mbm29f016a",            "Fujitsu MBM29F016A Flash")
 DEFINE_DEVICE_TYPE(FUJITSU_29DL164BD,     fujitsu_29dl164bd_device,     "mbm29dl164bd",          "Fujitsu MBM29DL164BD Flash")
 DEFINE_DEVICE_TYPE(FUJITSU_29LV002TC,     fujitsu_29lv002tc_device,     "mbm29lv002tc",          "Fujitsu MBM29LV002TC Flash")
 DEFINE_DEVICE_TYPE(FUJITSU_29LV800B,      fujitsu_29lv800b_device,      "mbm29lv800b",           "Fujitsu MBM29LV800B Flash")
+DEFINE_DEVICE_TYPE(FUJITSU_29F400T_16BIT, fujitsu_29f400t_16bit_device, "mbm29f400t_16bit",      "Fujitsu MBM29F400T Flash (16-bit)")
 DEFINE_DEVICE_TYPE(INTEL_E28F400B,        intel_e28f400b_device,        "intel_e28f400b",        "Intel E28F400B Flash")
 DEFINE_DEVICE_TYPE(MACRONIX_29F008TC,     macronix_29f008tc_device,     "macronix_29f008tc",     "Macronix 29F008TC Flash")
 DEFINE_DEVICE_TYPE(MACRONIX_29L001MC,     macronix_29l001mc_device,     "macronix_29l001mc",     "Macronix 29L001MC Flash")
 DEFINE_DEVICE_TYPE(MACRONIX_29LV160TMC,   macronix_29lv160tmc_device,   "macronix_29lv160tmc",   "Macronix 29LV160TMC Flash")
+DEFINE_DEVICE_TYPE(MACRONIX_29F1610,      macronix_29f1610_device,      "macronix_29f1610",      "Macronix MX29F1610 Flash")
 DEFINE_DEVICE_TYPE(TMS_29F040,            tms_29f040_device,            "tms_29f040",            "Texas Instruments 29F040 Flash")
 
 DEFINE_DEVICE_TYPE(PANASONIC_MN63F805MNP, panasonic_mn63f805mnp_device, "panasonic_mn63f805mnp", "Panasonic MN63F805MNP Flash")
@@ -187,6 +190,9 @@ fujitsu_29lv002tc_device::fujitsu_29lv002tc_device(const machine_config &mconfig
 
 fujitsu_29lv800b_device::fujitsu_29lv800b_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: intelfsh16_device(mconfig, FUJITSU_29LV800B, tag, owner, clock, 0x100000, MFG_FUJITSU, 0x225b) { m_bot_boot_sector = true; }
+	
+fujitsu_29f400t_16bit_device::fujitsu_29f400t_16bit_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+	: intelfsh16_device(mconfig, FUJITSU_29F400T_16BIT, tag, owner, clock, 0x100000, MFG_FUJITSU, 0x2223) { m_top_boot_sector = true; }
 
 sharp_lh28f016s_device::sharp_lh28f016s_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: intelfsh8_device(mconfig, SHARP_LH28F016S, tag, owner, clock, 0x200000, MFG_INTEL, 0xaa) { }
@@ -221,6 +227,9 @@ amd_29f800b_16bit_device::amd_29f800b_16bit_device(const machine_config &mconfig
 amd_29lv200t_device::amd_29lv200t_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: intelfsh8_device(mconfig, AMD_29LV200T, tag, owner, clock, 0x40000, MFG_AMD, 0x3b) { }
 
+amd_29lv800b_16bit_device::amd_29lv800b_16bit_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+	: intelfsh16_device(mconfig, AMD_29LV800B_16BIT, tag, owner, clock, 0x100000, MFG_AMD, 0x22da) { m_top_boot_sector = true; }
+
 cat28f020_device::cat28f020_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: intelfsh8_device(mconfig, CAT28F020, tag, owner, clock, 0x40000, MFG_CATALYST, 0xbd) { }
 
@@ -235,6 +244,9 @@ macronix_29l001mc_device::macronix_29l001mc_device(const machine_config &mconfig
 
 macronix_29lv160tmc_device::macronix_29lv160tmc_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: intelfsh8_device(mconfig, MACRONIX_29LV160TMC, tag, owner, clock, 0x20000, MFG_MACRONIX, 0x49) { m_sector_is_16k = true; }
+
+macronix_29f1610_device::macronix_29f1610_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
+	: intelfsh16_device(mconfig, MACRONIX_29F1610, tag, owner, clock, 0x200000, MFG_MACRONIX, 0x00f1) { m_page_size = 0x40; }
 
 panasonic_mn63f805mnp_device::panasonic_mn63f805mnp_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
 	: intelfsh8_device(mconfig, PANASONIC_MN63F805MNP, tag, owner, clock, 0x10000, MFG_PANASONIC, 0x1b) { m_sector_is_4k = true; }
@@ -336,7 +348,10 @@ TIMER_CALLBACK_MEMBER(intelfsh_device::delay_tick)
 	switch( m_flash_mode )
 	{
 	case FM_READSTATUS:
-		m_status = 0x80;
+		if ( (m_maker_id == MFG_MACRONIX && m_device_id == 0xf1) )
+			m_status = 0x20;
+		else
+			m_status = 0x80;
 		break;
 
 	case FM_ERASEAMD4:
@@ -546,10 +561,23 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
 		{
 		case 0xf0:
 		case 0xff:  // reset chip mode
-			m_flash_mode = FM_NORMAL;
+			// MX29F1610 needs to be reset with another command
+			if ( !(m_maker_id == MFG_MACRONIX && m_device_id == 0xf1) )
+			{
+				m_flash_mode = FM_NORMAL;
+			}
 			break;
 		case 0x90:  // read ID
-			m_flash_mode = FM_READID;
+			// AM29F800B, AM29LV800B, MBM29F400T and MX29F1610 don't support the 0x90 ID command.
+			if (
+				!(m_maker_id == MFG_FUJITSU && m_device_id == 0x22d6)
+				&& !(m_maker_id == MFG_AMD && m_device_id == 0x2258)
+				&& !(m_maker_id == MFG_AMD && m_device_id == 0x22da)
+				&& !(m_maker_id == MFG_MACRONIX && m_device_id == 0x00f1)
+			)
+			{
+				m_flash_mode = FM_READID;
+			}
 			break;
 		case 0x40:
 		case 0x10:  // program
@@ -653,11 +681,11 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
 		}
 		else if( ( address & 0xffff ) == 0x5555 && ( data & 0xff ) == 0xa0 )
 		{
-			if (m_maker_id == MFG_ATMEL && m_device_id == 0xd5)
+			if ( (m_maker_id == MFG_ATMEL && m_device_id == 0xd5) || (m_maker_id == MFG_MACRONIX && m_device_id == 0x00f1) )
 			{
 				m_flash_mode = FM_WRITEPAGEATMEL;
 				m_byte_count = 0;
-			}
+			} 
 			else
 			{
 				m_flash_mode = FM_BYTEPROGRAM;
@@ -849,7 +877,19 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
 			{
 				memset(&m_data[base & ~0xffff], 0xff, 64 * 1024);
 				m_erase_sector = address & ((m_bits == 16) ? ~0x7fff : ~0xffff);
-				m_timer->adjust( attotime::from_seconds( 1 ) );
+				if (
+					(m_maker_id == MFG_FUJITSU && m_device_id == 0x22d6)
+					|| (m_maker_id == MFG_AMD && m_device_id == 0x2258)
+					|| (m_maker_id == MFG_AMD && m_device_id == 0x22da)
+					|| (m_maker_id == MFG_MACRONIX && m_device_id == 0x00f1)
+				)
+				{
+					m_timer->adjust( attotime::from_msec( 125 ) );
+				}
+				else
+				{
+					m_timer->adjust( attotime::from_seconds( 1 ) );
+				}
 			}
 
 			m_status = 1 << 3;
@@ -921,7 +961,14 @@ void intelfsh_device::write_full(uint32_t address, uint32_t data)
 
 		if (m_byte_count == m_page_size)
 		{
-			m_flash_mode = FM_NORMAL;
+			if (m_maker_id == MFG_MACRONIX && m_device_id == 0x00f1)
+			{
+				m_flash_mode = FM_READSTATUS;
+			}
+			else
+			{
+				m_flash_mode = FM_NORMAL;
+			}
 		}
 		break;
 	case FM_CLEARPART1:
