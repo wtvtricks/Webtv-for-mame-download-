@@ -13,6 +13,10 @@
 		<rect state="0"><color red="0.20" green="0.0" blue="0.0" /></rect>
 	</element>
 
+	<element name="spacer">
+		<rect><color red="0.0" green="0.0" blue="0.0" /></rect>
+	</element>
+
 	<element name="text_power">
 		<text string="POWER"><color red="0.8" green="0.8" blue="0.8" /></text>
 	</element>
