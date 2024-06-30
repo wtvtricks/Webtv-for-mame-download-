@@ -1,12 +1,15 @@
 // license:BSD-3-Clause
-// copyright-holders:FairPlay137
+// copyright-holders:FairPlay137,wtvemac
 
 /***************************************************************************************
  *
  * WebTV FCS (1996)
  * 
- * The WebTV line of products was an early attempt to bring the Internet to the
- * television. Later on in its life, it was rebranded as MSN TV.
+ * The WebTV line of products was a set of thin clients meant to make the emerging-at-
+ * -the-time Internet accessible to those who weren't as familiar with computers,
+ * adapting websites for display on television sets, simplifying the control scheme to
+ * work with just a remote control and an optional keyboard, and optimizing them to work
+ * smoothly on low-cost hardware. Later on in its life, it was rebranded as MSN TV.
  * 
  * FCS, shorthand for First Customer Ship, was the first generation of WebTV hardware.
  * Its ASIC, known as SPOT or FIDO, is much simpler than SOLO.
@@ -19,12 +22,15 @@
  * to preserve technical specifications, as well as the various reverse-engineering
  * efforts that were made.
  * 
- * Known issues:
- * - The CPU gets thrown into the exception handler loop at bfc0c030, a little before
- *   the memory check. This has to be manually bypassed to continue the boot process.
- *   (Worked around in mips3 and mips3drc)
- * - AppROMs appear to crash shortly after power on, with debug AppROMs throwing up
- *   "### CACHE ERROR" when serial communication is wired up to the SmartCard slot.
+ * Currently unimplemented:
+ * - IR keyboard and remote emulation. This seems to be handled by a PIC16CR54AT on
+ *   board. No dump is currently available for this chip, so for the meantime it will
+ *   need to be emulated at a high level.
+ * - True SmartCard emulation. This would involve turning the SmartCard slot into its
+ *   own slot device.
+ * - WebTV Port emulation. On the right side of all WebTV FCS units is a port which was
+ *   used for add-ons. The only add-on which ever saw a release was an adapter which
+ *   allowed parallel port printers to work on this generation of WebTV hardware.
  * 
  ***************************************************************************************/
 
@@ -63,6 +69,7 @@ public:
 	void webtv1_base(machine_config& config);
 	void webtv1_sony(machine_config& config);
 	void webtv1_philips(machine_config& config);
+	void webtv1_bfe(machine_config& config);
 
 protected:
 	virtual void machine_start() override;
@@ -74,17 +81,21 @@ private:
 	required_device<ds2401_device> m_serial_id;
 	required_device<i2cmem_device> m_nvram;
 
-	required_device<amd_29f800b_16bit_device> m_flash0;
-	required_device<amd_29f800b_16bit_device> m_flash1;
+	required_device<intelfsh16_device> m_flash0;
+	required_device<intelfsh16_device> m_flash1;
 
 	uint8_t ram_flasher[RAM_FLASHER_SIZE];
+
+	uint8_t m_manufacturer_code; // temporary; will determine remote manufacturer
 
 	void bank0_flash_w(offs_t offset, uint32_t data);
 	uint32_t bank0_flash_r(offs_t offset);
 	uint8_t ram_flasher_r(offs_t offset);
 	void ram_flasher_w(offs_t offset, uint8_t data);
 
-	void webtv1_map(address_map& map);
+	void webtv1_base_map(address_map& map);
+	void webtv1_retail_map(address_map& map);
+	void webtv1_bfe_map(address_map& map);
 };
 
 //
@@ -125,24 +136,17 @@ private:
 void webtv1_state::bank0_flash_w(offs_t offset, uint32_t data)
 {
 	logerror("%s: bank0_flash_w 0x1f%06x = %08x\n", machine().describe_context(), offset, data);
-	//uint32_t actual_offset = offset & 0xfffff;
 	uint16_t upper_value = (data >> 16) & 0xffff;
-	//upper_value = (upper_value << 8) | ((upper_value >> 8) & 0xff);
 	m_flash0->write(offset, upper_value);
-
 	uint16_t lower_value = data & 0xffff;
-	//lower_value = (lower_value << 8) | ((lower_value >> 8) & 0xff);
 	m_flash1->write(offset, lower_value);
 }
 
 uint32_t webtv1_state::bank0_flash_r(offs_t offset)
 {
 	//logerror("%s: bank0_flash_r 0x1f%06x\n", machine().describe_context(), offset);
-	//uint32_t actual_offset = offset & 0xfffff;
 	uint16_t upper_value = m_flash0->read(offset);
-	//upper_value = (upper_value << 8) | ((upper_value >> 8) & 0xff);
 	uint16_t lower_value = m_flash1->read(offset);
-	//lower_value = (lower_value << 8) | ((lower_value >> 8) & 0xff);
 	return (upper_value << 16) | (lower_value);
 }
 
@@ -163,7 +167,7 @@ void webtv1_state::ram_flasher_w(offs_t offset, uint8_t data)
 	ram_flasher[offset & (RAM_FLASHER_SIZE - 1)] = data;
 }
 
-void webtv1_state::webtv1_map(address_map &map)
+void webtv1_state::webtv1_base_map(address_map &map)
 {
 	map.global_mask(0x1fffffff);
 
@@ -184,10 +188,23 @@ void webtv1_state::webtv1_map(address_map &map)
 	map(0x04003000, 0x04003fff).m(m_spotasic, FUNC(spot_asic_device::vid_unit_map));
 	map(0x04004000, 0x04004fff).m(m_spotasic, FUNC(spot_asic_device::dev_unit_map));
 	map(0x04005000, 0x04005fff).m(m_spotasic, FUNC(spot_asic_device::mem_unit_map));
+}
 
-	// ROM
-	map(0x1f000000, 0x1f3fffff).rw(FUNC(webtv1_state::bank0_flash_r), FUNC(webtv1_state::bank0_flash_w)).share("bank0"); // Flash ROM, 4MB (retail configuration 2MB)
-	map(0x1f800000, 0x1fffffff).rom().region("bank1", 0); // Mask ROM
+void webtv1_state::webtv1_retail_map(address_map &map)
+{
+	webtv1_base_map(map);
+
+	map(0x1f000000, 0x1f3fffff).rw(FUNC(webtv1_state::bank0_flash_r), FUNC(webtv1_state::bank0_flash_w)).share("bank0");
+	map(0x1f800000, 0x1fffffff).rom().region("bank1", 0);
+}
+
+void webtv1_state::webtv1_bfe_map(address_map &map)
+{
+	webtv1_base_map(map);
+
+	// bank1 is not populated on bfe-type units
+	map(0x1f800000, 0x1fdfffff).rom().region("bank0_mask", 0); // it's not clear whether bank0 was all flash or all mask on bfe-type units
+	map(0x1fe00000, 0x1fffffff).rw(FUNC(webtv1_state::bank0_flash_r), FUNC(webtv1_state::bank0_flash_w)).share("bank0_flash");
 }
 
 void webtv1_state::webtv1_base(machine_config &config)
@@ -197,10 +214,6 @@ void webtv1_state::webtv1_base(machine_config &config)
 	R4640BE(config, m_maincpu, SYSCLOCK*2);
 	m_maincpu->set_icache_size(0x2000);
 	m_maincpu->set_dcache_size(0x2000);
-	m_maincpu->set_addrmap(AS_PROGRAM, &webtv1_state::webtv1_map);
-
-	AMD_29F800B_16BIT(config, m_flash0, 0);
-	AMD_29F800B_16BIT(config, m_flash1, 0);
 
 	DS2401(config, m_serial_id, 0);
 
@@ -214,14 +227,29 @@ void webtv1_state::webtv1_base(machine_config &config)
 
 void webtv1_state::webtv1_sony(machine_config& config)
 {
-	// manufacturer is determined by the contents of DS2401
 	webtv1_base(config);
+	m_manufacturer_code = 0x00;
+	AMD_29F800B_16BIT(config, m_flash0, 0);
+	AMD_29F800B_16BIT(config, m_flash1, 0);
+	m_maincpu->set_addrmap(AS_PROGRAM, &webtv1_state::webtv1_retail_map);
 }
 
 void webtv1_state::webtv1_philips(machine_config& config)
 {
-	// manufacturer is determined by the contents of DS2401
 	webtv1_base(config);
+	m_manufacturer_code = 0x10;
+	AMD_29F800B_16BIT(config, m_flash0, 0);
+	AMD_29F800B_16BIT(config, m_flash1, 0);
+	m_maincpu->set_addrmap(AS_PROGRAM, &webtv1_state::webtv1_retail_map);
+}
+
+void webtv1_state::webtv1_bfe(machine_config& config)
+{
+	webtv1_base(config);
+	m_manufacturer_code = 0x20;
+	AMD_29F800B_16BIT(config, m_flash0, 0);
+	AMD_29F800B_16BIT(config, m_flash1, 0);
+	m_maincpu->set_addrmap(AS_PROGRAM, &webtv1_state::webtv1_bfe_map);
 }
 
 void webtv1_state::machine_start()
@@ -235,6 +263,7 @@ void webtv1_state::machine_reset()
 }
 
 // Sysconfig options are usually configured via resistors on the board.
+// TODO: set DIPLOCATIONs for used sysconfig parameters if we're gonna use PORT_DIPUNUSED_DIPLOC
 static INPUT_PORTS_START( retail_sys_config )
 	PORT_START("sys_config")
 
@@ -242,8 +271,8 @@ static INPUT_PORTS_START( retail_sys_config )
 	PORT_DIPUNUSED_DIPLOC(0x02, 0x02, "SW1:2")
 
 	PORT_DIPNAME(0x0c, 0x0c, "Board type")
-	PORT_DIPSETTING(0x00, "Reserved")
-	PORT_DIPSETTING(0x04, "Reserved")
+	//PORT_DIPSETTING(0x00, "Reserved")
+	//PORT_DIPSETTING(0x04, "Reserved")
 	PORT_DIPSETTING(0x08, "Trial-type board")
 	PORT_DIPSETTING(0x0c, "FCS board (retail)")
 
@@ -261,14 +290,14 @@ static INPUT_PORTS_START( retail_sys_config )
 	PORT_DIPUNUSED_DIPLOC(0x1000, 0x1000, "SW1:12")
 
 	PORT_DIPNAME(0x2000, 0x2000, "CPU output buffers")
-	PORT_DIPSETTING(0x0000, "83% CPU output buffers on reset")
-	PORT_DIPSETTING(0x2000, "50% CPU output buffers on reset (emulated behavior)")
+	//PORT_DIPSETTING(0x0000, "83% CPU output buffers on reset")
+	PORT_DIPSETTING(0x2000, "50% CPU output buffers on reset")
 
 	PORT_DIPNAME(0xc000, 0x8000, "CPU clock multiplier");
-	PORT_DIPSETTING(0x0000, "CPU clock = 5X bus clock")
-	PORT_DIPSETTING(0x4000, "CPU clock = 4X bus clock")
-	PORT_DIPSETTING(0x8000, "CPU clock = 2X bus clock (emulated behavior)")
-	PORT_DIPSETTING(0xc000, "CPU clock = 3X bus clock")
+	//PORT_DIPSETTING(0x0000, "CPU clock = 5X bus clock")
+	//PORT_DIPSETTING(0x4000, "CPU clock = 4X bus clock")
+	PORT_DIPSETTING(0x8000, "CPU clock = 2X bus clock")
+	//PORT_DIPSETTING(0xc000, "CPU clock = 3X bus clock")
 
 	PORT_DIPNAME(0x10000, 0x00000, "vidUnit clock source")
 	PORT_DIPSETTING(0x00000, "Use external video clock")
@@ -279,9 +308,9 @@ static INPUT_PORTS_START( retail_sys_config )
 	PORT_DIPSETTING(0x20000, "Use external DAC clock")
 
 	PORT_DIPNAME(0xc0000, 0xc0000, "audUnit DAC type");
-	PORT_DIPSETTING(0x00000, "Reserved")
-	PORT_DIPSETTING(0x40000, "Reserved")
-	PORT_DIPSETTING(0x80000, "Reserved")
+	//PORT_DIPSETTING(0x00000, "Reserved")
+	//PORT_DIPSETTING(0x40000, "Reserved")
+	//PORT_DIPSETTING(0x80000, "Reserved")
 	PORT_DIPSETTING(0xc0000, "AKM 4310/4309")
 
 	PORT_DIPNAME(0x300000, 0x200000, "Memory vendor")
@@ -303,12 +332,12 @@ static INPUT_PORTS_START( retail_sys_config )
 	PORT_DIPSETTING(0x3000000, "120ns/60ns")
 
 	PORT_DIPNAME(0x4000000, 0x0000000, "Bank 1 ROM mode")
-	PORT_DIPSETTING(0x0000000, "No page mode (emulated behavior)")
-	PORT_DIPSETTING(0x4000000, "Supports page mode")
+	PORT_DIPSETTING(0x0000000, "No page mode")
+	//PORT_DIPSETTING(0x4000000, "Supports page mode")
 
 	PORT_DIPNAME(0x8000000, 0x8000000, "Bank 1 ROM type")
-	PORT_DIPSETTING(0x0000000, "Flash ROM")
-	PORT_DIPSETTING(0x8000000, "Mask ROM (emulated behavior)")
+	//PORT_DIPSETTING(0x0000000, "Flash ROM")
+	PORT_DIPSETTING(0x8000000, "Mask ROM")
 
 	PORT_DIPNAME(0x30000000, 0x20000000, "Bank 0 ROM speed")
 	PORT_DIPSETTING(0x00000000, "200ns/100ns")
@@ -317,12 +346,12 @@ static INPUT_PORTS_START( retail_sys_config )
 	PORT_DIPSETTING(0x30000000, "120ns/60ns")
 
 	PORT_DIPNAME(0x40000000, 0x00000000, "Bank 0 ROM mode")
-	PORT_DIPSETTING(0x00000000, "No page mode (emulated behavior)")
-	PORT_DIPSETTING(0x40000000, "Supports page mode")
+	PORT_DIPSETTING(0x00000000, "No page mode")
+	//PORT_DIPSETTING(0x40000000, "Supports page mode")
 
 	PORT_DIPNAME(0x80000000, 0x00000000, "Bank 0 ROM type")
-	PORT_DIPSETTING(0x00000000, "Flash ROM (emulated behavior)")
-	PORT_DIPSETTING(0x80000000, "Mask ROM")
+	PORT_DIPSETTING(0x00000000, "Flash ROM")
+	//PORT_DIPSETTING(0x80000000, "Mask ROM")
 INPUT_PORTS_END
 
 // This is emulator-specific config options that go beyond sysconfig offers.
@@ -350,9 +379,10 @@ ROM_START( wtv1sony )
 	ROM_LOAD("ds2401.bin", 0x0000, 0x0008, NO_DUMP)
 
 	ROM_REGION32_BE(0x800000, "bank1", 0)
-	ROM_LOAD("bootrom.o", 0x000000, 0x200000, NO_DUMP) /* pre-decoded; from archival efforts of the WebTV update servers */
+	ROM_LOAD("bootrom.o", 0x000000, 0x200000, CRC(5ad8f7b6) SHA1(a5c411f5f0126e79a0d925822062203c2272faf8)) /* bf0boot 105 pre-decoded; from archival efforts of the WebTV update servers */
 	ROM_RELOAD(0x200000, 0x200000)
 	ROM_RELOAD(0x400000, 0x200000)
+	ROM_RELOAD(0x600000, 0x200000)
 ROM_END
 
 ROM_START( wtv1phil )
@@ -360,11 +390,24 @@ ROM_START( wtv1phil )
 	ROM_LOAD("ds2401.bin", 0x0000, 0x0008, NO_DUMP)
 
 	ROM_REGION32_BE(0x800000, "bank1", 0)
-	ROM_LOAD("bootrom.o", 0x000000, 0x200000, NO_DUMP) /* pre-decoded; from archival efforts of the WebTV update servers */
+	ROM_LOAD("bootrom.o", 0x000000, 0x200000, CRC(5ad8f7b6) SHA1(a5c411f5f0126e79a0d925822062203c2272faf8)) /* bf0boot 105 pre-decoded; from archival efforts of the WebTV update servers */
 	ROM_RELOAD(0x200000, 0x200000)
 	ROM_RELOAD(0x400000, 0x200000)
+	ROM_RELOAD(0x600000, 0x200000)
 ROM_END
 
-//    YEAR  NAME      PARENT  COMPAT  MACHINE         INPUT         CLASS         INIT        COMPANY               FULLNAME                            FLAGS
-CONS( 1996, wtv1sony,      0,      0, webtv1_sony,    retail_input, webtv1_state, empty_init, "Sony",               "INT-W100 WebTV Internet Terminal", MACHINE_NOT_WORKING + MACHINE_NO_SOUND )
-CONS( 1996, wtv1phil,      0,      0, webtv1_philips, retail_input, webtv1_state, empty_init, "Philips-Magnavox",   "MAT960 WebTV Internet Terminal",   MACHINE_NOT_WORKING + MACHINE_NO_SOUND )
+ROM_START( wtv1bfe )
+	ROM_REGION(0x8, "serial_id", 0)     /* Electronic Serial DS2401 */
+	ROM_LOAD("ds2401.bin", 0x0000, 0x0008, NO_DUMP)
+
+	ROM_REGION32_BE(0x600000, "bank0_mask", 0)
+	ROM_SYSTEM_BIOS(0, "bfe105", "Standard bfe-type BootROM (1.0, build 105)")
+	ROMX_LOAD("bootrom.o", 0x400000, 0x200000, CRC(71c321db) SHA1(6a39e064fb2312d70728b8105de990762226bd07), ROM_BIOS(0))
+	ROM_SYSTEM_BIOS(1, "prealpha-boot", "Pre-alpha bfe-type BootROM") // checksum for clean unmodified build has yet to be confirmed
+	ROMX_LOAD("prealpha-boot.o", 0x400000, 0x200000, NO_DUMP, ROM_BIOS(1))
+ROM_END
+
+//    YEAR  NAME      PARENT  COMPAT  MACHINE         INPUT         CLASS         INIT        COMPANY                FULLNAME                                    FLAGS
+CONS( 1996, wtv1sony,      0,      0, webtv1_sony,    retail_input, webtv1_state, empty_init, "Sony",                "INT-W100 WebTV Internet Terminal",         MACHINE_NOT_WORKING | MACHINE_IMPERFECT_TIMING )
+CONS( 1996, wtv1phil,      0,      0, webtv1_philips, retail_input, webtv1_state, empty_init, "Philips-Magnavox",    "MAT960 WebTV Internet Terminal",           MACHINE_NOT_WORKING | MACHINE_IMPERFECT_TIMING )
+CONS( 1996, wtv1bfe,       0,      0, webtv1_bfe,     retail_input, webtv1_state, empty_init, "WebTV Networks Inc.", "prototype/demo WebTV FCS unit (bfe-type)", MACHINE_NOT_WORKING | MACHINE_IS_INCOMPLETE | MACHINE_IMPERFECT_TIMING )

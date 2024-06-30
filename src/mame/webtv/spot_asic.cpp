@@ -569,7 +569,7 @@ void spot_asic_device::reg_010c_w(uint32_t data)
 	if (data&BUS_INT_VIDINT)
 		logerror("%s: VIDINT bus interrupt cleared\n", machine().describe_context());
 
-	if (data != BUS_INT_DEVMOD) // The modem timinng is incorrect, so ignore the ROM trying to disable the modem interrupt.
+	if (data != BUS_INT_DEVMOD) // HACK: The modem timing is incorrect, so ignore the ROM trying to disable the modem interrupt.
 		m_intenable &= ~(data & 0xFF);
 }
 
@@ -1014,7 +1014,7 @@ void spot_asic_device::reg_313c_w(uint32_t data)
 uint32_t spot_asic_device::reg_4000_r()
 {
 	logerror("%s: reg_4000_r (DEV_IRDATA)\n", machine().describe_context());
-	// TODO: This seems to have been handled by a PIC16CR54AT. We do not have the ROM for this chip, so its behavior will need to be emulated at a high level.
+	// TODO: implement high-level IR controller emulation
 	return 0;
 }
 
@@ -1150,20 +1150,21 @@ void spot_asic_device::reg_400c_w(uint32_t data)
 uint32_t spot_asic_device::reg_4010_r()
 {
 	logerror("%s: reg_4010_r (DEV_SCCNTL)\n", machine().describe_context());
+	// TODO: refactor bangserial into its own device which attaches to a smartcard slot device!
 	if (m_emu_config->read() & EMUCONFIG_BANGSERIAL)
 	{
-		// bitbang functionality does not accept smartcard input
+		// bangserial implementation does not yet implement TX
 		return 0;
 	}
 	else
 	{
-		// TODO: get data!
 		return 0;
 	}
 }
 
 void spot_asic_device::reg_4010_w(uint32_t data)
 {
+	// TODO: refactor bangserial into its own device which attaches to a smartcard slot device!
 	if (m_emu_config->read() & EMUCONFIG_BANGSERIAL)
 	{
 		m_smrtcrd_serial_bitmask = (m_smrtcrd_serial_bitmask << 1) | 1;
