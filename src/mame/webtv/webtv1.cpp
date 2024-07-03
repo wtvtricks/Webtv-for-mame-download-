@@ -228,7 +228,7 @@ void webtv1_state::webtv1_base(machine_config &config)
 void webtv1_state::webtv1_sony(machine_config& config)
 {
 	webtv1_base(config);
-	m_manufacturer_code = 0x00;
+	m_manufacturer_code = 0x00; // Sony
 	AMD_29F800B_16BIT(config, m_flash0, 0);
 	AMD_29F800B_16BIT(config, m_flash1, 0);
 	m_maincpu->set_addrmap(AS_PROGRAM, &webtv1_state::webtv1_retail_map);
@@ -237,7 +237,7 @@ void webtv1_state::webtv1_sony(machine_config& config)
 void webtv1_state::webtv1_philips(machine_config& config)
 {
 	webtv1_base(config);
-	m_manufacturer_code = 0x10;
+	m_manufacturer_code = 0x10; // Philips-Magnavox
 	AMD_29F800B_16BIT(config, m_flash0, 0);
 	AMD_29F800B_16BIT(config, m_flash1, 0);
 	m_maincpu->set_addrmap(AS_PROGRAM, &webtv1_state::webtv1_retail_map);
@@ -246,10 +246,19 @@ void webtv1_state::webtv1_philips(machine_config& config)
 void webtv1_state::webtv1_bfe(machine_config& config)
 {
 	webtv1_base(config);
-	m_manufacturer_code = 0x20;
+	m_manufacturer_code = 0x20; // WebTV Generic
 	AMD_29F800B_16BIT(config, m_flash0, 0);
 	AMD_29F800B_16BIT(config, m_flash1, 0);
 	m_maincpu->set_addrmap(AS_PROGRAM, &webtv1_state::webtv1_bfe_map);
+}
+
+void webtv1_state::webtv1_japan(machine_config& config)
+{
+	webtv1_base(config);
+	m_manufacturer_code = 0x00; // Sony
+	MACRONIX_29F1610_16BIT(config, m_flash0, 0);
+	MACRONIX_29F1610_16BIT(config, m_flash1, 0);
+	m_maincpu->set_addrmap(AS_PROGRAM, &webtv1_state::webtv1_retail_map);
 }
 
 void webtv1_state::machine_start()
@@ -396,6 +405,15 @@ ROM_START( wtv1phil )
 	ROM_RELOAD(0x600000, 0x200000)
 ROM_END
 
+ROM_START( wtv1jpn )
+	ROM_REGION(0x8, "serial_id", 0)     /* Electronic Serial DS2401 */
+	ROM_LOAD("ds2401.bin", 0x0000, 0x0008, NO_DUMP)
+
+	ROM_REGION32_BE(0x800000, "bank1", 0)
+	ROM_LOAD("bootrom.o", 0x000000, 0x400000, NO_DUMP) /* This ROM is expected to be a japan-4MegBoot type */
+	ROM_RELOAD(0x400000, 0x400000)
+ROM_END
+
 ROM_START( wtv1bfe )
 	ROM_REGION(0x8, "serial_id", 0)     /* Electronic Serial DS2401 */
 	ROM_LOAD("ds2401.bin", 0x0000, 0x0008, NO_DUMP)
@@ -407,7 +425,8 @@ ROM_START( wtv1bfe )
 	ROMX_LOAD("prealpha-boot.o", 0x400000, 0x200000, NO_DUMP, ROM_BIOS(1))
 ROM_END
 
-//    YEAR  NAME      PARENT  COMPAT  MACHINE         INPUT         CLASS         INIT        COMPANY                FULLNAME                                    FLAGS
-CONS( 1996, wtv1sony,      0,      0, webtv1_sony,    retail_input, webtv1_state, empty_init, "Sony",                "INT-W100 WebTV Internet Terminal",         MACHINE_NOT_WORKING | MACHINE_IMPERFECT_TIMING )
-CONS( 1996, wtv1phil,      0,      0, webtv1_philips, retail_input, webtv1_state, empty_init, "Philips-Magnavox",    "MAT960 WebTV Internet Terminal",           MACHINE_NOT_WORKING | MACHINE_IMPERFECT_TIMING )
-CONS( 1996, wtv1bfe,       0,      0, webtv1_bfe,     retail_input, webtv1_state, empty_init, "WebTV Networks Inc.", "prototype/demo WebTV FCS unit (bfe-type)", MACHINE_NOT_WORKING | MACHINE_IS_INCOMPLETE | MACHINE_IMPERFECT_TIMING )
+//    YEAR   NAME      PARENT    COMPAT  MACHINE         INPUT         CLASS         INIT        COMPANY                FULLNAME                                    FLAGS
+CONS( 1996,  wtv1sony,        0,      0, webtv1_sony,    retail_input, webtv1_state, empty_init, "Sony",                "INT-W100 WebTV Internet Terminal",         MACHINE_NOT_WORKING | MACHINE_IMPERFECT_TIMING )
+CONS( 1996,  wtv1phil,        0,      0, webtv1_philips, retail_input, webtv1_state, empty_init, "Philips-Magnavox",    "MAT960 WebTV Internet Terminal",           MACHINE_NOT_WORKING | MACHINE_IMPERFECT_TIMING )
+CONS( 1996,  wtv1bfe,         0,      0, webtv1_bfe,     retail_input, webtv1_state, empty_init, "WebTV Networks Inc.", "prototype/trial WebTV FCS box (bfe-type)", MACHINE_NOT_WORKING | MACHINE_IS_INCOMPLETE | MACHINE_IMPERFECT_TIMING )
+CONS( 1996?, wtv1jpn,         0,      0, webtv1_japan,   retail_input, webtv1_state, empty_init, "Sony?",               "unknown Japanese WebTV trial box",         MACHINE_NOT_WORKING | MACHINE_IMPERFECT_TIMING )

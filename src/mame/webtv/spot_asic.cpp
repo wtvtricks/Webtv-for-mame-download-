@@ -1453,12 +1453,7 @@ void spot_asic_device::reg_5008_w(uint32_t data)
 	m_memdata = data;
 }
 
-/*uint32_t spot_asic_device::reg_500c_r()
-{
-	logerror("%s: reg_500c_r (MEM_CMD - not a readable register!)\n", machine().describe_context());
-	// FIXME: This is defined as a write-only register, yet the WebTV software reads from it? Still need to see what the software expects from this.
-	return 0;
-}*/
+// TODO: Determine if reg_500c_r not being implemented causes unexpected behavior. If so, add it back in.
 
 void spot_asic_device::reg_500c_w(uint32_t data)
 {
@@ -1555,8 +1550,8 @@ TIMER_CALLBACK_MEMBER(spot_asic_device::flush_modem_buffer)
 
 void spot_asic_device::vblank_irq(int state) 
 {
-	// Not to spec but does get the intended result.
-	// All video interrupts are classed the same in the ROM.
+	// HACK: Every other line should be an even, but since all video interrupts are classed the same in the ROM, this at least gets official WebTV software working.
+	// If there is other software that reads the exact video interrupt type, this may cause problems.
 	spot_asic_device::set_vid_irq(VID_INT_VSYNCO, 1);
 }
 
