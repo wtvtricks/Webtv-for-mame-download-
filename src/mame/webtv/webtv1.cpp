@@ -70,6 +70,7 @@ public:
 	void webtv1_sony(machine_config& config);
 	void webtv1_philips(machine_config& config);
 	void webtv1_bfe(machine_config& config);
+	void webtv1_japan(machine_config& config);
 
 protected:
 	virtual void machine_start() override;
@@ -256,8 +257,8 @@ void webtv1_state::webtv1_japan(machine_config& config)
 {
 	webtv1_base(config);
 	m_manufacturer_code = 0x00; // Sony
-	MACRONIX_29F1610_16BIT(config, m_flash0, 0);
-	MACRONIX_29F1610_16BIT(config, m_flash1, 0);
+	MACRONIX_29F1610(config, m_flash0, 0);
+	MACRONIX_29F1610(config, m_flash1, 0);
 	m_maincpu->set_addrmap(AS_PROGRAM, &webtv1_state::webtv1_retail_map);
 }
 
@@ -422,7 +423,7 @@ ROM_START( wtv1bfe )
 	ROM_SYSTEM_BIOS(0, "bfe105", "Standard bfe-type BootROM (1.0, build 105)")
 	ROMX_LOAD("bootrom.o", 0x400000, 0x200000, CRC(71c321db) SHA1(6a39e064fb2312d70728b8105de990762226bd07), ROM_BIOS(0))
 	ROM_SYSTEM_BIOS(1, "prealpha-boot", "Pre-alpha bfe-type BootROM") // checksum for clean unmodified build has yet to be confirmed
-	ROMX_LOAD("prealpha-boot.o", 0x400000, 0x200000, NO_DUMP, ROM_BIOS(1))
+	ROMX_LOAD("prealpha-boot.o", 0x400000, 0x200000, BAD_DUMP CRC(f23fbfd3) SHA1(f046ecc4ff46f3afca9a413c7c1022246c36e7ff), ROM_BIOS(1))
 ROM_END
 
 //    YEAR   NAME      PARENT    COMPAT  MACHINE         INPUT         CLASS         INIT        COMPANY                FULLNAME                                    FLAGS
