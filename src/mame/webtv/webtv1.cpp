@@ -100,17 +100,17 @@ private:
 };
 
 //
-// WebTV stores the approm across 2 flash chips. The approm firmware is upgradable over a network.
+// WebTV stores the AppROM across 2 flash chips. The AppROM firmware is upgradable over a network.
 //
 // There's two 16-bit flash chips striped across a 32-bit bus. The chip with the upper 16-bits is labeled U0501, and lower is U0502.
 //
-// WebTV supports flash configurations to allow 1MB (2 x 4Mbit chips), 2MB (2 x 8Mbit chips) and 4MB (2 x 16Mbit chips) approm images.
-// The 1MB flash configuration seems possible but it's unknown if it was used, 2MB flash configuration was released to the public
-// and it seemed a 4MB flash configuration was used for debug builds during approm development as well as for a prototype Japan box.
+// WebTV supports flash configurations to allow 1MB (2 x 4Mbit chips), 2MB (2 x 8Mbit chips) and 4MB (2 x 16Mbit chips) AppROM images.
+// The 1MB flash configuration was likely used very early in development, although this hasn't been confirmed. Production boxes used
+// the 2MB configuration, while debug units and the Japan trial units likely used the 4MB configuration.
 //
-// 1MB:          AM29F400AT + AM29F400AT (citation needed)
-// Production:   AM29F800BT + AM29F800BT
-// 4MB debug/JP: MX29F1610  + MX29F1610  (citation needed)
+// 1MB:            AM29F400AT + AM29F400AT (NOT CONFIRMED)
+// 2MB Production: AM29F800BT + AM29F800BT
+// 4MB debug/JP:   MX29F1610  + MX29F1610  (NOT CONFIRMED)
 //
 // WebTV supported SO-44 flash chips:
 //
@@ -132,7 +132,7 @@ private:
 // bank0_flash0 = U0501
 // bank0_flash1 = U0502
 //
-// NOTE: if you dump these chips you may need to byte swap the output. The bus is big-endian.
+// NOTE: If you dump these chips from a real box you may need to byte swap the output, as the bus is big-endian.
 //
 void webtv1_state::bank0_flash_w(offs_t offset, uint32_t data)
 {
@@ -273,7 +273,6 @@ void webtv1_state::machine_reset()
 }
 
 // Sysconfig options are usually configured via resistors on the board.
-// TODO: set DIPLOCATIONs for used sysconfig parameters if we're gonna use PORT_DIPUNUSED_DIPLOC
 static INPUT_PORTS_START( retail_sys_config )
 	PORT_START("sys_config")
 
@@ -281,87 +280,103 @@ static INPUT_PORTS_START( retail_sys_config )
 	PORT_DIPUNUSED_DIPLOC(0x02, 0x02, "SW1:2")
 
 	PORT_DIPNAME(0x0c, 0x0c, "Board type")
-	//PORT_DIPSETTING(0x00, "Reserved")
-	//PORT_DIPSETTING(0x04, "Reserved")
+	PORT_DIPLOCATION("SW1:3,4")
+	PORT_DIPSETTING(0x00, "Reserved")
+	PORT_DIPSETTING(0x04, "Reserved")
 	PORT_DIPSETTING(0x08, "Trial-type board")
 	PORT_DIPSETTING(0x0c, "FCS board (retail)")
 
-	PORT_DIPNAME(0xf0, 0x80, "Board revision");
+	PORT_DIPNAME(0xf0, 0x80, "Board revision")
+	PORT_DIPLOCATION("SW1:5,6,7,8")
 
-	PORT_DIPUNUSED_DIPLOC(0x100, 0x100, "SW1:8")
-	PORT_DIPUNUSED_DIPLOC(0x200, 0x200, "SW1:9")
-	PORT_DIPUNUSED_DIPLOC(0x400, 0x400, "SW1:10")
+	PORT_DIPUNUSED_DIPLOC(0x100, 0x100, "SW1:9")
+	PORT_DIPUNUSED_DIPLOC(0x200, 0x200, "SW1:10")
+	PORT_DIPUNUSED_DIPLOC(0x400, 0x400, "SW1:11")
 
 	// A 24.54MHz or 29.5MHz crystal drives the SAA7187 encoder chip. These pixel clocks are divisors of that input.
-	PORT_DIPNAME(0x800, 0x800, "NTSC/PAL");
+	PORT_DIPNAME(0x800, 0x800, "NTSC/PAL")
+	PORT_DIPLOCATION("SW1:12")
 	PORT_DIPSETTING(0x000, "PAL mode w/ 14.75MHz pixel clock")
 	PORT_DIPSETTING(0x800, "NTSC mode w/ 12.26MHz pixel clock")
 
-	PORT_DIPUNUSED_DIPLOC(0x1000, 0x1000, "SW1:12")
+	PORT_DIPUNUSED_DIPLOC(0x1000, 0x1000, "SW1:13")
 
 	PORT_DIPNAME(0x2000, 0x2000, "CPU output buffers")
-	//PORT_DIPSETTING(0x0000, "83% CPU output buffers on reset")
+	PORT_DIPLOCATION("SW1:14")
+	PORT_DIPSETTING(0x0000, "83% CPU output buffers on reset")
 	PORT_DIPSETTING(0x2000, "50% CPU output buffers on reset")
 
-	PORT_DIPNAME(0xc000, 0x8000, "CPU clock multiplier");
-	//PORT_DIPSETTING(0x0000, "CPU clock = 5X bus clock")
-	//PORT_DIPSETTING(0x4000, "CPU clock = 4X bus clock")
+	PORT_DIPNAME(0xc000, 0x8000, "CPU clock multiplier")
+	PORT_DIPLOCATION("SW1:15,16")
+	PORT_DIPSETTING(0x0000, "CPU clock = 5X bus clock")
+	PORT_DIPSETTING(0x4000, "CPU clock = 4X bus clock")
 	PORT_DIPSETTING(0x8000, "CPU clock = 2X bus clock")
-	//PORT_DIPSETTING(0xc000, "CPU clock = 3X bus clock")
+	PORT_DIPSETTING(0xc000, "CPU clock = 3X bus clock")
 
 	PORT_DIPNAME(0x10000, 0x00000, "vidUnit clock source")
+	PORT_DIPLOCATION("SW1:17")
 	PORT_DIPSETTING(0x00000, "Use external video clock")
 	PORT_DIPSETTING(0x10000, "SPOT controlled video clock")
 
 	PORT_DIPNAME(0x20000, 0x00000, "audUnit clock source")
+	PORT_DIPLOCATION("SW1:18")
 	PORT_DIPSETTING(0x00000, "SPOT controlled DAC clock")
 	PORT_DIPSETTING(0x20000, "Use external DAC clock")
 
-	PORT_DIPNAME(0xc0000, 0xc0000, "audUnit DAC type");
-	//PORT_DIPSETTING(0x00000, "Reserved")
-	//PORT_DIPSETTING(0x40000, "Reserved")
-	//PORT_DIPSETTING(0x80000, "Reserved")
+	PORT_DIPNAME(0xc0000, 0xc0000, "audUnit DAC type")
+	PORT_DIPLOCATION("SW1:19,20")
+	PORT_DIPSETTING(0x00000, "Reserved")
+	PORT_DIPSETTING(0x40000, "Reserved")
+	PORT_DIPSETTING(0x80000, "Reserved")
 	PORT_DIPSETTING(0xc0000, "AKM 4310/4309")
 
 	PORT_DIPNAME(0x300000, 0x200000, "Memory vendor")
+	PORT_DIPLOCATION("SW1:21,22")
 	PORT_DIPSETTING(0x000000, "Other")
 	PORT_DIPSETTING(0x100000, "Samsung")
 	PORT_DIPSETTING(0x200000, "Fujitsu")
 	PORT_DIPSETTING(0x300000, "NEC")
 
 	PORT_DIPNAME(0xc00000, 0xC00000, "Memory speed")
+	PORT_DIPLOCATION("SW1:23,24")
 	PORT_DIPSETTING(0x000000, "100MHz parts")
 	PORT_DIPSETTING(0x400000, "66MHz parts")
 	PORT_DIPSETTING(0x800000, "77MHz parts")
 	PORT_DIPSETTING(0xc00000, "83MHz parts")
 
 	PORT_DIPNAME(0x3000000, 0x3000000, "Bank 1 ROM speed")
+	PORT_DIPLOCATION("SW1:25,26")
 	PORT_DIPSETTING(0x0000000, "200ns/100ns")
 	PORT_DIPSETTING(0x1000000, "100ns/50ns")
 	PORT_DIPSETTING(0x2000000, "90ns/45ns")
 	PORT_DIPSETTING(0x3000000, "120ns/60ns")
 
 	PORT_DIPNAME(0x4000000, 0x0000000, "Bank 1 ROM mode")
+	PORT_DIPLOCATION("SW1:27")
 	PORT_DIPSETTING(0x0000000, "No page mode")
-	//PORT_DIPSETTING(0x4000000, "Supports page mode")
+	PORT_DIPSETTING(0x4000000, "Supports page mode")
 
 	PORT_DIPNAME(0x8000000, 0x8000000, "Bank 1 ROM type")
-	//PORT_DIPSETTING(0x0000000, "Flash ROM")
+	PORT_DIPLOCATION("SW1:28")
+	PORT_DIPSETTING(0x0000000, "Flash ROM")
 	PORT_DIPSETTING(0x8000000, "Mask ROM")
 
 	PORT_DIPNAME(0x30000000, 0x20000000, "Bank 0 ROM speed")
+	PORT_DIPLOCATION("SW1:29,30")
 	PORT_DIPSETTING(0x00000000, "200ns/100ns")
 	PORT_DIPSETTING(0x10000000, "100ns/50ns")
 	PORT_DIPSETTING(0x20000000, "90ns/45ns")
 	PORT_DIPSETTING(0x30000000, "120ns/60ns")
 
 	PORT_DIPNAME(0x40000000, 0x00000000, "Bank 0 ROM mode")
+	PORT_DIPLOCATION("SW1:31")
 	PORT_DIPSETTING(0x00000000, "No page mode")
-	//PORT_DIPSETTING(0x40000000, "Supports page mode")
+	PORT_DIPSETTING(0x40000000, "Supports page mode")
 
 	PORT_DIPNAME(0x80000000, 0x00000000, "Bank 0 ROM type")
+	PORT_DIPLOCATION("SW1:32")
 	PORT_DIPSETTING(0x00000000, "Flash ROM")
-	//PORT_DIPSETTING(0x80000000, "Mask ROM")
+	PORT_DIPSETTING(0x80000000, "Mask ROM")
 INPUT_PORTS_END
 
 // This is emulator-specific config options that go beyond sysconfig offers.

@@ -45798,9 +45798,10 @@ jupiter2                        //
 jupiter3                        //
 
 @source:webtv/webtv1.cpp
-wtv1sony                        //
-wtv1phil                        //
+wtv1sony                        // INT-W100
+wtv1phil                        // MAT960
 wtv1bfe                         //
+wtv1jpn                         //
 
 @source:webtv/webtv2.cpp
 wtv2sony                        //
