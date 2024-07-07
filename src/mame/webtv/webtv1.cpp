@@ -16,7 +16,8 @@
  * 
  * A typical retail configuration uses a MIPS IDT R4640 clocked at 112MHz, with 2MB of
  * on-board RAM, 2MB of flash memory (using two 16-bit 1MB AMD 29F800B chips) for the
- * updatable software, and 2MB of mask ROM.
+ * updatable software (referred to AppROMs from this point onwards), and 2MB of mask
+ * ROM (across two 1MB chips).
  * 
  * This driver would not have been possible without the efforts of the WebTV community
  * to preserve technical specifications, as well as the various reverse-engineering
@@ -31,6 +32,10 @@
  * - WebTV Port emulation. On the right side of all WebTV FCS units is a port which was
  *   used for add-ons. The only add-on which ever saw a release was an adapter which
  *   allowed parallel port printers to work on this generation of WebTV hardware.
+ * 
+ * Planned additions:
+ * - 4MB RAM configuration for PAL units and debug units - all later builds are VERY
+ *   unstable in PAL mode and prone to running out of RAM.
  * 
  ***************************************************************************************/
 
@@ -174,7 +179,7 @@ void webtv1_state::webtv1_base_map(address_map &map)
 
 	// RAM
 	map(0x00000000, 0x001fffff).ram().mirror(0x600000).share("ram"); // 2MB configuration (retail)
-	//map(0x00000000, 0x003fffff).ram().mirror(0x400000).share("ram"); // 4MB configuration (debug)
+	//map(0x00000000, 0x003fffff).ram().mirror(0x400000).share("ram"); // 4MB configuration (extended)
 	//map(0x00000000, 0x007fffff).ram().share("ram");                  // 8MB configuration (full)
 	// The RAM flash code gets mirrored across the entire RAM region.
 	map(0x00000000, 0x00000000 + (RAM_FLASHER_SIZE - 1)).rw(FUNC(webtv1_state::ram_flasher_r), FUNC(webtv1_state::ram_flasher_w));

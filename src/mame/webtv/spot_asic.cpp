@@ -214,7 +214,7 @@ void spot_asic_device::device_add_mconfig(machine_config &config)
 	at_keyb.keypress().set(m_kbdc, FUNC(kbdc8042_device::keyboard_w));
 
 	WATCHDOG_TIMER(config, m_watchdog);
-	spot_asic_device::watchdog_enable(0);
+	spot_asic_device::watchdog_enable(false);
 }
 
 void spot_asic_device::device_resolve_objects()
@@ -288,6 +288,7 @@ void spot_asic_device::device_start()
 
 void spot_asic_device::device_reset()
 {
+	m_watchdog->watchdog_enable(false); // Disable watchdog on reset; it'll be updated to the proper state later
 	dac_update_timer->adjust(attotime::from_hz(AUD_DEFAULT_CLK), 0, attotime::from_hz(AUD_DEFAULT_CLK));
 
 	m_memcntl = 0b11;
@@ -424,13 +425,12 @@ void spot_asic_device::pixel_buffer_index_update()
 void spot_asic_device::watchdog_enable(int state)
 {
 	m_wdenable = state;
-
+	m_watchdog->watchdog_enable(m_wdenable);
 	if (m_wdenable)
 		m_watchdog->set_time(attotime::from_usec(WATCHDOG_TIMER_USEC));
 	else
 		m_watchdog->set_time(attotime::zero);
 
-	m_watchdog->watchdog_enable(m_wdenable);
 }
 
 uint32_t spot_asic_device::reg_0000_r()
@@ -563,14 +563,14 @@ void spot_asic_device::reg_010c_w(uint32_t data)
 	if (data&BUS_INT_DEVIR)
 		logerror("%s: DEVIR bus interrupt cleared\n", machine().describe_context());
 	if (data&BUS_INT_DEVMOD)
-		logerror("%s: DEVMOD bus interrupt cleared\n", machine().describe_context());
+		logerror("%s: DEVMOD bus interrupt cleared (HACK: ignored!)\n", machine().describe_context());
 	if (data&BUS_INT_DEVKBD)
 		logerror("%s: DEVKBD bus interrupt cleared\n", machine().describe_context());
 	if (data&BUS_INT_VIDINT)
 		logerror("%s: VIDINT bus interrupt cleared\n", machine().describe_context());
 
 	if (data != BUS_INT_DEVMOD) // HACK: The modem timing is incorrect, so ignore the ROM trying to disable the modem interrupt.
-		m_intenable &= ~(data & 0xFF);
+		m_intenable &= ~(data & 0xDF);
 }
 
 uint32_t spot_asic_device::reg_0010_r()

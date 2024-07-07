@@ -75,7 +75,7 @@ constexpr uint32_t BUS_INT_VIDINT = 1 << 7; // vidUnit interrupt (program should
 constexpr uint32_t BUS_INT_DEVKBD = 1 << 6; // keyboard IRQ
 constexpr uint32_t BUS_INT_DEVMOD = 1 << 5; // modem IRQ
 constexpr uint32_t BUS_INT_DEVIR  = 1 << 4; // IR data ready to read
-constexpr uint32_t BUS_INT_DEVSMC = 1 << 3; // SmartCard inserted
+constexpr uint32_t BUS_INT_DEVSMC = 1 << 3; // SmartCard IRQ
 constexpr uint32_t BUS_INT_AUDDMA = 1 << 2; // audUnit DMA completion
 
 // These are guessed pixel clocks. They were chosen because they cause expected behaviour in emulation.
